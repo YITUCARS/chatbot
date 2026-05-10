@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<meta name="format-detection" content="telephone=no" />
+<title>yitu 租车助手</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f7f5f1;
+    --ink: #1a1714;
+    --ink-2: #5a544c;
+    --line: #e3ddd0;
+    --bubble-user: #1a1714;
+    --bubble-bot: #ffffff;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--ink); font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif; font-size: 15px; -webkit-font-smoothing: antialiased; overflow: hidden; }
+
+  .app { display: flex; flex-direction: column; height: 100dvh; }
+
+  /* —— 顶部 —— */
+  .header {
+    flex: none; display: flex; align-items: center; gap: 12px;
+    padding: 14px 18px; background: var(--bg);
+    border-bottom: 1px solid var(--line);
+  }
+  .avatar {
+    width: 38px; height: 38px; border-radius: 50%; background: var(--ink);
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 16px; letter-spacing: 0.5px;
+  }
+  .header .name { font-size: 16px; font-weight: 600; line-height: 1.2; }
+  .header .status { font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+  .header .status .dot { display: inline-block; width: 6px; height: 6px; background: #2e9a5d; border-radius: 50%; margin-right: 4px; vertical-align: 1px; }
+
+  /* —— 消息区 —— */
+  .messages {
+    flex: 1; overflow-y: auto; padding: 16px 14px 24px;
+    -webkit-overflow-scrolling: touch;
+    display: flex; flex-direction: column; gap: 12px;
+  }
+  .msg { display: flex; max-width: 86%; }
+  .msg.user { align-self: flex-end; }
+  .msg.bot { align-self: flex-start; }
+  .bubble {
+    padding: 11px 15px; border-radius: 18px; line-height: 1.55;
+    word-break: break-word; white-space: pre-wrap; font-size: 15px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+  }
+  .msg.bot .bubble { background: var(--bubble-bot); color: var(--ink); border-bottom-left-radius: 6px; border: 1px solid var(--line); }
+  .msg.user .bubble { background: var(--bubble-user); color: #fff; border-bottom-right-radius: 6px; }
+  .meta { font-size: 11px; color: var(--ink-2); text-align: center; padding: 4px 0; }
+  .typing .bubble { display: flex; gap: 4px; padding: 14px 16px; }
+  .typing .dot { width: 6px; height: 6px; background: var(--ink-2); border-radius: 50%; opacity: 0.4; animation: blink 1.2s infinite; }
+  .typing .dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink { 0%, 80%, 100% { opacity: 0.3; } 40% { opacity: 1; } }
+
+  /* —— 快捷问题 —— */
+  .suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .suggestions button {
+    border: 1px solid var(--line); background: #fff; color: var(--ink);
+    padding: 8px 14px; border-radius: 999px; font-size: 13.5px; font-family: inherit;
+  }
+  .suggestions button:active { background: var(--ink); color: #fff; }
+
+  /* —— 转人工按钮 —— */
+  .human-bar { padding: 8px 14px 4px; }
+  .human-bar button {
+    width: 100%; background: transparent; border: 1px dashed var(--line);
+    padding: 10px; border-radius: 12px; color: var(--ink-2);
+    font-family: inherit; font-size: 13.5px;
+  }
+
+  /* —— 输入区 —— */
+  .input-area {
+    flex: none; background: var(--bg); border-top: 1px solid var(--line);
+    padding: 10px 12px calc(10px + var(--safe-bottom));
+    display: flex; gap: 8px; align-items: flex-end;
+  }
+  .input-area textarea {
+    flex: 1; resize: none; border: 1px solid var(--line); background: #fff;
+    border-radius: 22px; padding: 11px 16px; font-size: 15px; font-family: inherit;
+    outline: none; min-height: 44px; max-height: 110px; line-height: 1.4;
+    color: var(--ink);
+  }
+  .input-area textarea:focus { border-color: var(--ink); }
+  .input-area button.send {
+    background: var(--ink); color: #fff; border: 0; border-radius: 22px;
+    height: 44px; min-width: 64px; padding: 0 18px;
+    font-size: 15px; font-weight: 600; font-family: inherit;
+  }
+  .input-area button.send:disabled { opacity: 0.4; }
+
+  /* —— 联系弹窗 —— */
+  .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: flex-end; justify-content: center; z-index: 100; }
+  .modal-mask.open { display: flex; }
+  .modal {
+    background: #fff; width: 100%; border-top-left-radius: 20px; border-top-right-radius: 20px;
+    padding: 24px 22px calc(24px + var(--safe-bottom)); animation: slideUp 0.25s ease;
+  }
+  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .modal h3 { margin: 0 0 6px; font-size: 18px; }
+  .modal p { margin: 0 0 18px; font-size: 13.5px; color: var(--ink-2); }
+  .modal label { display: block; font-size: 13px; color: var(--ink-2); margin: 10px 0 6px; }
+  .modal input { width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; font-family: inherit; font-size: 15px; outline: none; }
+  .modal input:focus { border-color: var(--ink); }
+  .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+  .modal-actions button { flex: 1; padding: 12px; border-radius: 12px; font-family: inherit; font-size: 15px; font-weight: 600; }
+  .btn-cancel { background: var(--bg); border: 1px solid var(--line); color: var(--ink); }
+  .btn-confirm { background: var(--ink); border: 0; color: #fff; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="header">
+    <div class="avatar" id="avatar">V</div>
+    <div>
+      <div class="name" id="botName">yitu 助手</div>
+      <div class="status"><span class="dot"></span>在线</div>
+    </div>
+  </div>
+
+  <div class="messages" id="messages"></div>
+
+  <div class="human-bar">
+    <button onclick="openContact()">📞 联系人工客服</button>
+  </div>
+
+  <div class="input-area">
+    <textarea id="input" rows="1" placeholder="请输入您的问题..." enterkeyhint="send"></textarea>
+    <button class="send" id="sendBtn" onclick="send()">发送</button>
+  </div>
+</div>
+
+<div id="contactModal" class="modal-mask">
+  <div class="modal">
+    <h3>联系人工客服</h3>
+    <p>请留下您的姓名和电话，客服会尽快回拨。</p>
+    <label>姓名</label>
+    <input id="cName" type="text" placeholder="您的姓名" />
+    <label>电话</label>
+    <input id="cPhone" type="tel" inputmode="tel" placeholder="手机号" />
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeContact()">取消</button>
+      <button class="btn-confirm" onclick="submitContact()">提交</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SESSION_KEY = 'yitu_chat_session'
+let sessionId = localStorage.getItem(SESSION_KEY)
+if (!sessionId) {
+  sessionId = (crypto.randomUUID && crypto.randomUUID()) || ('s_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8))
+  localStorage.setItem(SESSION_KEY, sessionId)
+}
+
+const $ = id => document.getElementById(id)
+const msgWrap = $('messages')
+const input = $('input')
+const sendBtn = $('sendBtn')
+let history = []
+let sending = false
+let config = { bot_name: 'yitu 助手', welcome_msg: '您好！欢迎咨询～', suggestions: ['车型价格', '押金', '保险', '取还车'], enabled: true }
+
+const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
+
+function scrollDown() { requestAnimationFrame(() => { msgWrap.scrollTop = msgWrap.scrollHeight }) }
+
+function addMessage(text, who, opts = {}) {
+  const el = document.createElement('div')
+  el.className = 'msg ' + who
+  el.innerHTML = `<div class="bubble">${escapeHtml(text)}</div>`
+  msgWrap.appendChild(el)
+  if (opts.suggestions?.length) {
+    const sg = document.createElement('div')
+    sg.className = 'suggestions'
+    sg.style.alignSelf = 'flex-start'
+    sg.innerHTML = opts.suggestions.map(s => `<button>${escapeHtml(s)}</button>`).join('')
+    sg.querySelectorAll('button').forEach(b => b.onclick = () => { input.value = b.textContent; send() })
+    msgWrap.appendChild(sg)
+  }
+  scrollDown()
+}
+
+function addTyping() {
+  const el = document.createElement('div')
+  el.className = 'msg bot typing'
+  el.id = 'typing'
+  el.innerHTML = `<div class="bubble"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>`
+  msgWrap.appendChild(el)
+  scrollDown()
+}
+function removeTyping() {
+  const el = $('typing'); if (el) el.remove()
+}
+
+async function loadConfig() {
+  try {
+    const resp = await fetch('/api/chat/config')
+    const c = await resp.json()
+    config = { ...config, ...c }
+    $('botName').textContent = config.bot_name
+    $('avatar').textContent = (config.bot_name || 'V').slice(0, 1).toUpperCase()
+    addMessage(config.welcome_msg, 'bot', { suggestions: config.suggestions })
+  } catch (e) {
+    addMessage('连接失败，请稍后再试。', 'bot')
+  }
+}
+
+async function send() {
+  const text = input.value.trim()
+  if (!text || sending) return
+  sending = true; sendBtn.disabled = true
+  addMessage(text, 'user')
+  history.push({ role: 'user', content: text })
+  input.value = ''
+  input.style.height = 'auto'
+  addTyping()
+
+  try {
+    const resp = await fetch('/api/chat/send', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ message: text, session_id: sessionId, history: history.slice(-10) }),
+    })
+    const data = await resp.json()
+    removeTyping()
+    if (!resp.ok) {
+      addMessage(data.error || '出错了，请稍后再试。', 'bot')
+    } else {
+      addMessage(data.reply, 'bot')
+      history.push({ role: 'assistant', content: data.reply })
+    }
+  } catch (e) {
+    removeTyping()
+    addMessage('网络不稳定，请稍后再试～', 'bot')
+  } finally {
+    sending = false; sendBtn.disabled = false
+    input.focus()
+  }
+}
+
+// 自动调整输入框高度
+input.addEventListener('input', () => {
+  input.style.height = 'auto'
+  input.style.height = Math.min(110, input.scrollHeight) + 'px'
+})
+input.addEventListener('keydown', e => {
+  // 桌面端 Enter 发送，Shift+Enter 换行；移动端走 enterkeyhint=send
+  if (e.key === 'Enter' && !e.shiftKey && !('ontouchstart' in window)) {
+    e.preventDefault(); send()
+  }
+})
+
+// 联系人工
+function openContact() { $('contactModal').classList.add('open') }
+function closeContact() { $('contactModal').classList.remove('open') }
+async function submitContact() {
+  const name = $('cName').value.trim()
+  const phone = $('cPhone').value.trim()
+  if (!name || !phone) { alert('请填写姓名和电话'); return }
+  // 把联系请求作为一条「问题」走 chat，方便后台看到
+  await fetch('/api/chat/send', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      message: `[转人工请求] 姓名：${name}，电话：${phone}`,
+      session_id: sessionId,
+      history: [],
+    }),
+  }).catch(() => {})
+  closeContact()
+  addMessage(`已收到您的联系方式（${name} ${phone}），客服会尽快回拨，请保持电话畅通～`, 'bot')
+}
+
+loadConfig()
+</script>
+</body>
+</html>
