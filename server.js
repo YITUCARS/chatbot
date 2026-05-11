@@ -187,6 +187,79 @@ app.post('/api/admin/settings', requireAdmin, (req, res) => {
   res.json({ ok: true })
 })
 
+// 拉取 provider 可用模型列表（直接调官方 /v1/models 接口）
+// 1 分钟内存缓存，避免后台多次切换/刷新时反复 hit
+const modelsCache = new Map()  // key: provider:apiKeyHash → { at, list }
+const MODELS_TTL_MS = 60_000
+
+// 简单哈希，避免 key 进缓存键
+function hashKey(s) {
+  let h = 0
+  for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0
+  return String(h)
+}
+
+// 过滤出聊天/视觉类模型，剔除 embeddings / tts / whisper / dall-e / moderation 等
+function isOpenAIChatModel(id) {
+  if (!/^(gpt-|chatgpt-|o\d)/i.test(id)) return false
+  if (/embedding|whisper|tts|dall-e|moderation|search|realtime|transcribe/i.test(id)) return false
+  return true
+}
+
+async function fetchOpenAIModels(apiKey) {
+  const resp = await fetch('https://api.openai.com/v1/models', {
+    headers: { authorization: `Bearer ${apiKey}` },
+  })
+  const data = await resp.json().catch(() => ({}))
+  if (!resp.ok) throw new Error(data?.error?.message || `OpenAI ${resp.status}`)
+  const list = (data.data || [])
+    .filter(m => isOpenAIChatModel(m.id))
+    .sort((a, b) => (b.created || 0) - (a.created || 0))
+    .map(m => ({ id: m.id, created: m.created, owned_by: m.owned_by }))
+  return list
+}
+
+async function fetchClaudeModels(apiKey) {
+  const resp = await fetch('https://api.anthropic.com/v1/models?limit=100', {
+    headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+  })
+  const data = await resp.json().catch(() => ({}))
+  if (!resp.ok) throw new Error(data?.error?.message || `Claude ${resp.status}`)
+  const list = (data.data || [])
+    .map(m => ({ id: m.id, display_name: m.display_name, created: Date.parse(m.created_at || '') / 1000 || 0 }))
+    .sort((a, b) => b.created - a.created)
+  return list
+}
+
+app.post('/api/admin/models', requireAdmin, async (req, res) => {
+  try {
+    const all = db.getAllSettings()
+    const body = req.body || {}
+    const provider = body.provider || all.provider || 'claude'
+
+    // 优先使用前端传入的未保存 key（首次配置场景），否则用 DB 里已保存的
+    const keyField = provider === 'openai' ? 'openai_api_key' : 'claude_api_key'
+    const rawOverride = body[keyField]
+    const overrideValid = typeof rawOverride === 'string' && rawOverride && !rawOverride.includes('***')
+    const apiKey = overrideValid ? rawOverride : all[keyField]
+    if (!apiKey) {
+      return res.status(400).json({ error: `请先填写 ${provider === 'openai' ? 'OpenAI' : 'Claude'} API Key` })
+    }
+
+    const cacheKey = `${provider}:${hashKey(apiKey)}`
+    const cached = modelsCache.get(cacheKey)
+    if (cached && Date.now() - cached.at < MODELS_TTL_MS && !body.force) {
+      return res.json({ models: cached.list, cached: true })
+    }
+
+    const list = provider === 'openai' ? await fetchOpenAIModels(apiKey) : await fetchClaudeModels(apiKey)
+    modelsCache.set(cacheKey, { at: Date.now(), list })
+    res.json({ models: list, cached: false })
+  } catch (e) {
+    res.status(400).json({ error: e.message })
+  }
+})
+
 // 测试 API 连接
 // 允许前端临时传入未保存的 key / model 做合并测试，支持「先测试再保存」流程
 app.post('/api/admin/test-api', requireAdmin, async (req, res) => {

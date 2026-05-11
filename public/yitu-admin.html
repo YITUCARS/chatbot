@@ -229,14 +229,24 @@
 
         <div id="claudeBlock">
           <label>Claude 模型</label>
-          <input id="s_claude_model" type="text" placeholder="claude-sonnet-4-6" />
+          <div style="display:flex;gap:8px;align-items:stretch">
+            <input id="s_claude_model" type="text" list="claudeModels" placeholder="claude-sonnet-4-6（点击或下拉选择）" style="flex:1" />
+            <button class="btn" type="button" onclick="refreshModels('claude')" title="从 Anthropic 拉取最新模型列表">↻</button>
+          </div>
+          <datalist id="claudeModels"></datalist>
+          <div class="small" id="claudeModelHint" style="margin-top:4px;color:var(--ink-2)"></div>
           <label>Claude API Key</label>
           <input id="s_claude_api_key" type="password" placeholder="sk-ant-..." />
         </div>
 
         <div id="openaiBlock">
           <label>OpenAI 模型</label>
-          <input id="s_openai_model" type="text" placeholder="gpt-4o" />
+          <div style="display:flex;gap:8px;align-items:stretch">
+            <input id="s_openai_model" type="text" list="openaiModels" placeholder="gpt-5（点击或下拉选择）" style="flex:1" />
+            <button class="btn" type="button" onclick="refreshModels('openai')" title="从 OpenAI 拉取最新模型列表">↻</button>
+          </div>
+          <datalist id="openaiModels"></datalist>
+          <div class="small" id="openaiModelHint" style="margin-top:4px;color:var(--ink-2)"></div>
           <label>OpenAI API Key</label>
           <input id="s_openai_api_key" type="password" placeholder="sk-..." />
         </div>
@@ -605,12 +615,48 @@ async function loadSettings() {
   $('s_max_tokens').value = s.max_tokens || 1000
   $('s_system_prompt').value = s.system_prompt || ''
   toggleProviderBlocks()
+  // 进设置页自动尝试拉一次当前 provider 的模型列表（如已有 key 就能直接看到下拉）
+  refreshModels($('s_provider').value, { silent: true })
 }
-$('s_provider')?.addEventListener('change', toggleProviderBlocks)
+$('s_provider')?.addEventListener('change', () => {
+  toggleProviderBlocks()
+  refreshModels($('s_provider').value, { silent: true })
+})
 function toggleProviderBlocks() {
   const p = $('s_provider').value
   $('claudeBlock').style.display = p === 'claude' ? '' : 'none'
   $('openaiBlock').style.display = p === 'openai' ? '' : 'none'
+}
+
+// ─────────────── 模型列表 ───────────────
+async function refreshModels(provider, opts = {}) {
+  const silent = !!opts.silent
+  const hintEl = $(provider === 'openai' ? 'openaiModelHint' : 'claudeModelHint')
+  const dataListEl = $(provider === 'openai' ? 'openaiModels' : 'claudeModels')
+  if (!silent) { hintEl.textContent = '正在拉取模型列表...'; hintEl.style.color = 'var(--ink-2)' }
+  try {
+    const body = { provider, force: !silent }
+    // 携带未保存的 key，首次配置时也能拉
+    const ck = $('s_claude_api_key').value
+    const ok = $('s_openai_api_key').value
+    if (ck && !ck.includes('***')) body.claude_api_key = ck
+    if (ok && !ok.includes('***')) body.openai_api_key = ok
+    const r = await api('/api/admin/models', { method: 'POST', body })
+    const list = r.models || []
+    dataListEl.innerHTML = list.map(m => {
+      const label = m.display_name ? `${m.display_name} — ${m.id}` : m.id
+      return `<option value="${m.id}" label="${label}"></option>`
+    }).join('')
+    if (!silent) {
+      hintEl.textContent = `共 ${list.length} 个可用模型${r.cached ? '（缓存）' : '（刚刷新）'}`
+      hintEl.style.color = 'var(--green)'
+    }
+  } catch (e) {
+    if (!silent) {
+      hintEl.textContent = '拉取失败：' + e.message + '（仍可手动输入模型名）'
+      hintEl.style.color = 'var(--red)'
+    }
+  }
 }
 async function saveSettings() {
   const payload = {
