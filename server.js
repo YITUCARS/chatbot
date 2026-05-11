@@ -2,6 +2,7 @@
 // 路由分两块：/api/admin/* 需登录；/api/chat/* 公开（H5 调用）
 
 require('dotenv').config()
+const fs = require('fs')
 const path = require('path')
 const express = require('express')
 const session = require('express-session')
@@ -16,6 +17,7 @@ const { generateReply, testConnection } = require('./lib/ai')
 const PORT = Number(process.env.PORT) || 3000
 const SESSION_SECRET = process.env.SESSION_SECRET || 'change-me-in-env'
 const IS_PROD = process.env.NODE_ENV === 'production'
+const PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, '')
 
 const app = express()
 app.set('trust proxy', 1)
@@ -326,7 +328,15 @@ app.post('/api/chat/feedback', (req, res) => {
 // ── 静态资源 ────────────────────────────────────────────────
 app.use(express.static(path.join(__dirname, 'public')))
 app.get('/admin', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'yitu-admin.html')))
-app.get('/chat', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'yitu-chat.html')))
+
+// /chat：注入 PUBLIC_BASE_URL 用于 Open Graph / 微信卡片 meta 的绝对地址
+const chatHtmlRaw = fs.readFileSync(path.join(__dirname, 'public', 'yitu-chat.html'), 'utf8')
+const chatHtml = chatHtmlRaw.replace(/__PUBLIC_BASE_URL__/g, PUBLIC_BASE_URL)
+app.get('/chat', (_req, res) => {
+  res.set('Content-Type', 'text/html; charset=utf-8')
+  res.send(chatHtml)
+})
+
 app.get('/', (_req, res) => res.redirect('/admin'))
 
 // ── 错误兜底 ────────────────────────────────────────────────

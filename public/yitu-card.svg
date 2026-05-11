@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a1714"/>
+      <stop offset="100%" stop-color="#3a322a"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <g fill="#f7f5f1" font-family="'PingFang SC','Microsoft YaHei',-apple-system,sans-serif">
+    <text x="80" y="220" font-size="56" font-weight="700" letter-spacing="2">yitu Rental Cars</text>
+    <text x="80" y="320" font-size="88" font-weight="800" letter-spacing="-2">租车智能助手</text>
+    <text x="80" y="430" font-size="32" font-weight="400" opacity="0.78">7×24 在线问答 · 车型 / 价格 / 押金 / 取还车</text>
+    <text x="80" y="555" font-size="24" font-weight="500" opacity="0.55">chat.yiturentalcars.co.nz</text>
+  </g>
+  <circle cx="1060" cy="140" r="48" fill="#f7f5f1" opacity="0.92"/>
+  <text x="1060" y="156" text-anchor="middle" font-size="44" font-weight="800" fill="#1a1714" font-family="'PingFang SC',sans-serif">易</text>
+</svg>
