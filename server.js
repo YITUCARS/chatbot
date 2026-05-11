@@ -187,11 +187,24 @@ app.post('/api/admin/settings', requireAdmin, (req, res) => {
 })
 
 // 测试 API 连接
+// 允许前端临时传入未保存的 key / model 做合并测试，支持「先测试再保存」流程
 app.post('/api/admin/test-api', requireAdmin, async (req, res) => {
   try {
     const all = db.getAllSettings()
-    const provider = (req.body?.provider) || all.provider || 'claude'
-    const result = await testConnection({ provider, settings: all })
+    const body = req.body || {}
+    const provider = body.provider || all.provider || 'claude'
+    const merged = { ...all }
+    const override = (k) => {
+      if (k in body) {
+        const v = String(body[k] || '')
+        if (v && !v.includes('***')) merged[k] = v
+      }
+    }
+    override('claude_api_key')
+    override('openai_api_key')
+    if (body.claude_model) merged.claude_model = body.claude_model
+    if (body.openai_model) merged.openai_model = body.openai_model
+    const result = await testConnection({ provider, settings: merged })
     res.json(result)
   } catch (e) {
     res.status(400).json({ ok: false, error: e.message })

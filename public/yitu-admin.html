@@ -639,7 +639,17 @@ async function testApi() {
   r.textContent = '测试中...'
   r.style.color = 'var(--ink-2)'
   try {
-    const result = await api('/api/admin/test-api', { method: 'POST', body: { provider: $('s_provider').value } })
+    const body = {
+      provider: $('s_provider').value,
+      claude_model: $('s_claude_model').value,
+      openai_model: $('s_openai_model').value,
+    }
+    // 把当前输入框里未保存的 key 一起带过去，让用户能在保存前先验证 key 是否可用
+    const ck = $('s_claude_api_key').value
+    const ok = $('s_openai_api_key').value
+    if (ck && !ck.includes('***')) body.claude_api_key = ck
+    if (ok && !ok.includes('***')) body.openai_api_key = ok
+    const result = await api('/api/admin/test-api', { method: 'POST', body })
     if (result.ok) {
       r.textContent = '✓ 连接成功'; r.style.color = 'var(--green)'
     } else {
