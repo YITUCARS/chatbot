@@ -35,7 +35,8 @@ app.use(cors({
   credentials: true,
 }))
 
-app.use(express.json({ limit: '256kb' }))
+// 8mb：支持最多 4 张图片（前端已压缩至长边 ≤1568px JPEG）+ 文本/历史
+app.use(express.json({ limit: '8mb' }))
 app.use(session({
   name: 'yitu.sid',
   secret: SESSION_SECRET,
@@ -251,29 +252,56 @@ app.get('/api/chat/config', (_req, res) => {
   })
 })
 
+// 校验前端传来的 base64 data URL：必须是 image/* 且大小可控
+const DATA_URL_RE = /^data:(image\/(?:jpeg|png|webp|gif));base64,([A-Za-z0-9+/=]+)$/
+const MAX_IMAGES_PER_MSG = 4
+const MAX_IMAGE_BASE64_LEN = 6 * 1024 * 1024  // 单张图 base64 字符串上限 ~6MB（解码后 ~4.5MB）
+
+function validateImages(images) {
+  if (!Array.isArray(images) || images.length === 0) return []
+  if (images.length > MAX_IMAGES_PER_MSG) {
+    throw new Error(`最多附带 ${MAX_IMAGES_PER_MSG} 张图片`)
+  }
+  for (const url of images) {
+    if (typeof url !== 'string' || !DATA_URL_RE.test(url)) {
+      throw new Error('图片格式不合法')
+    }
+    if (url.length > MAX_IMAGE_BASE64_LEN) {
+      throw new Error('单张图片过大，请重试')
+    }
+  }
+  return images
+}
+
 app.post('/api/chat/send', chatRateLimiter, async (req, res) => {
   try {
     const { message, session_id, history } = req.body || {}
-    if (!message || typeof message !== 'string') {
+    let images = []
+    try { images = validateImages(req.body?.images) } catch (e) { return res.status(400).json({ error: e.message }) }
+
+    const hasText = typeof message === 'string' && message.trim().length > 0
+    const hasImages = images.length > 0
+    if (!hasText && !hasImages) {
       return res.status(400).json({ error: '消息不能为空' })
     }
-    if (message.length > 1000) {
+    if (hasText && message.length > 1000) {
       return res.status(400).json({ error: '消息过长（最多 1000 字）' })
     }
+    const userMessage = hasText ? message : '（用户上传了图片，请基于图片内容回答）'
 
     const settings = db.getAllSettings()
     if (settings.enabled === false) {
       return res.json({ reply: '客服系统暂时关闭，请稍后再试或联系电话客服。', source: 'system' })
     }
 
-    // 1. 话术匹配
-    if (settings.script_first !== false) {
-      const script = matchScript(message, db.listScripts())
+    // 1. 话术匹配（仅纯文本时尝试，图片消息直接走 AI）
+    if (!hasImages && settings.script_first !== false) {
+      const script = matchScript(userMessage, db.listScripts())
       if (script) {
         const reply = script.reply
         if (settings.log_enabled !== false) {
           db.addLog({
-            user_msg: message, bot_reply: reply, source: 'script',
+            user_msg: userMessage, bot_reply: reply, source: 'script',
             matched_kb_ids: [], provider: '', session_id,
           })
         }
@@ -281,8 +309,11 @@ app.post('/api/chat/send', chatRateLimiter, async (req, res) => {
       }
     }
 
-    // 2. 知识库检索
-    const kbItems = searchKnowledge(message, 5)
+    // 2. 知识库检索（基于文本；纯图片消息会得到空数组）
+    const kbItems = hasText ? searchKnowledge(userMessage, 5) : []
+
+    // 日志里只标记图片数量，不存 base64（会撑爆 DB）
+    const logUserMsg = hasImages ? `[图片 ${images.length} 张] ${hasText ? userMessage : ''}`.trim() : userMessage
 
     // 3. AI 生成
     const provider = settings.provider || 'claude'
@@ -293,33 +324,35 @@ app.post('/api/chat/send', chatRateLimiter, async (req, res) => {
         settings,
         knowledgeItems: kbItems,
         history: Array.isArray(history) ? history.slice(-10) : [],
-        userMessage: message,
+        userMessage,
+        images,
       })
     } catch (e) {
       console.error('[AI error]', e.message)
       // 兜底
-      if (kbItems.length > 0) {
-        // 至少能给一段知识库摘要
+      if (hasImages) {
+        reply = `抱歉，识别图片时出错了：${e.message}。请稍后再试，或用文字描述您的问题。`
+      } else if (kbItems.length > 0) {
         reply = `关于您的问题，请参考以下信息：\n\n${kbItems[0].content}\n\n如需进一步咨询，请联系人工客服。`
       } else {
         reply = '抱歉，我暂时无法回答这个问题。您可以留下电话，由人工客服联系您～'
-        db.recordUnanswered(message)
+        db.recordUnanswered(userMessage)
       }
       if (settings.log_enabled !== false) {
         db.addLog({
-          user_msg: message, bot_reply: reply, source: 'fallback',
+          user_msg: logUserMsg, bot_reply: reply, source: 'fallback',
           matched_kb_ids: kbItems.map(k => k.id), provider, session_id,
         })
       }
       return res.json({ reply, source: 'fallback', error: e.message })
     }
 
-    const source = kbItems.length > 0 ? 'rag' : 'ai_only'
-    if (kbItems.length === 0) db.recordUnanswered(message)
+    const source = hasImages ? 'ai_vision' : (kbItems.length > 0 ? 'rag' : 'ai_only')
+    if (!hasImages && kbItems.length === 0) db.recordUnanswered(userMessage)
 
     if (settings.log_enabled !== false) {
       db.addLog({
-        user_msg: message, bot_reply: reply, source,
+        user_msg: logUserMsg, bot_reply: reply, source,
         matched_kb_ids: kbItems.map(k => k.id), provider, session_id,
       })
     }

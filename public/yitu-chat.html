@@ -126,7 +126,60 @@
     font-size: 15px; font-weight: 600; font-family: inherit;
   }
   .input-area button.send:disabled { opacity: 0.4; }
+  .input-area button.attach {
+    background: #fff; color: var(--ink); border: 1px solid var(--line);
+    border-radius: 22px; height: 44px; width: 44px; padding: 0;
+    font-size: 20px; line-height: 1; flex: none;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .input-area button.attach:active { background: var(--line); }
+  .input-area button.attach:disabled { opacity: 0.4; }
 
+  /* —— 待发送缩略图条 —— */
+  .thumb-strip {
+    flex: none; background: var(--bg); padding: 8px 12px 0;
+    display: none; gap: 8px; overflow-x: auto;
+  }
+  .thumb-strip.has-items { display: flex; }
+  .thumb {
+    position: relative; flex: none; width: 64px; height: 64px;
+    border-radius: 12px; overflow: hidden; border: 1px solid var(--line);
+    background: #fff;
+  }
+  .thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .thumb .x {
+    position: absolute; top: 2px; right: 2px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(0,0,0,0.65); color: #fff;
+    border: 0; padding: 0; font-size: 13px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .thumb.uploading::after {
+    content: ''; position: absolute; inset: 0;
+    background: rgba(255,255,255,0.6) url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'><circle cx='12' cy='12' r='9' fill='none' stroke='%231a1714' stroke-width='2' stroke-linecap='round' stroke-dasharray='14 14'><animateTransform attributeName='transform' type='rotate' from='0 12 12' to='360 12 12' dur='0.9s' repeatCount='indefinite'/></circle></svg>") center/24px no-repeat;
+  }
+
+  /* —— 气泡内图片 —— */
+  .bubble .imgs {
+    display: grid; gap: 4px; margin: 0 0 6px;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    max-width: 240px;
+  }
+  .bubble .imgs.count-1 { grid-template-columns: minmax(140px, 220px); }
+  .bubble .imgs img {
+    width: 100%; aspect-ratio: 1 / 1; object-fit: cover;
+    border-radius: 10px; display: block; cursor: zoom-in;
+  }
+  .bubble .imgs.count-1 img { aspect-ratio: auto; max-height: 280px; object-fit: contain; background: rgba(0,0,0,0.04); }
+
+  /* —— 图片放大查看 —— */
+  .img-viewer {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+    display: none; align-items: center; justify-content: center; z-index: 200;
+    padding: 20px;
+  }
+  .img-viewer.open { display: flex; }
+  .img-viewer img { max-width: 100%; max-height: 100%; display: block; }
 </style>
 </head>
 <body>
@@ -142,11 +195,17 @@
 
   <div class="messages" id="messages"></div>
 
+  <div class="thumb-strip" id="thumbStrip"></div>
+
   <div class="input-area">
+    <input type="file" id="fileInput" accept="image/*" multiple hidden />
+    <button class="attach" id="attachBtn" type="button" aria-label="上传图片" title="上传图片">📎</button>
     <textarea id="input" rows="1" placeholder="请输入您的问题..." enterkeyhint="send"></textarea>
     <button class="send" id="sendBtn" onclick="send()">发送</button>
   </div>
 </div>
+
+<div class="img-viewer" id="imgViewer" onclick="closeViewer()"><img id="imgViewerImg" alt="" /></div>
 
 <script>
 const SESSION_KEY = 'yitu_chat_session'
@@ -160,9 +219,18 @@ const $ = id => document.getElementById(id)
 const msgWrap = $('messages')
 const input = $('input')
 const sendBtn = $('sendBtn')
+const fileInput = $('fileInput')
+const attachBtn = $('attachBtn')
+const thumbStrip = $('thumbStrip')
 let history = []
 let sending = false
 let config = { bot_name: 'yitu 助手', welcome_msg: '您好！欢迎咨询～', suggestions: ['车型价格', '押金', '保险', '取还车'], enabled: true }
+
+// 图片：仅存在 JS 内存，刷新/关闭页面即释放，从不写入 localStorage / 服务器磁盘
+const MAX_IMAGES = 4
+const MAX_IMAGE_SIDE = 1568   // 长边像素上限，Claude 推荐
+const JPEG_QUALITY = 0.82
+let pendingImages = []  // Array<{ id, dataUrl, uploading? }>
 
 const escapeHtml = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))
 
@@ -171,7 +239,15 @@ function scrollDown() { requestAnimationFrame(() => { msgWrap.scrollTop = msgWra
 function addMessage(text, who, opts = {}) {
   const el = document.createElement('div')
   el.className = 'msg ' + who
-  el.innerHTML = `<div class="bubble">${escapeHtml(text)}</div>`
+  const imgs = opts.images || []
+  let imgsHtml = ''
+  if (imgs.length) {
+    imgsHtml = `<div class="imgs count-${Math.min(imgs.length, 4)}">` +
+      imgs.map(src => `<img src="${escapeHtml(src)}" alt="" onclick="openViewer('${escapeHtml(src)}')" />`).join('') +
+      `</div>`
+  }
+  const textHtml = text ? escapeHtml(text) : ''
+  el.innerHTML = `<div class="bubble">${imgsHtml}${textHtml}</div>`
   msgWrap.appendChild(el)
   if (opts.suggestions?.length) {
     const sg = document.createElement('div')
@@ -183,6 +259,9 @@ function addMessage(text, who, opts = {}) {
   }
   scrollDown()
 }
+
+function openViewer(src) { $('imgViewerImg').src = src; $('imgViewer').classList.add('open') }
+function closeViewer() { $('imgViewer').classList.remove('open'); $('imgViewerImg').src = '' }
 
 function addTyping() {
   const el = document.createElement('div')
@@ -211,19 +290,30 @@ async function loadConfig() {
 
 async function send() {
   const text = input.value.trim()
-  if (!text || sending) return
-  sending = true; sendBtn.disabled = true
-  addMessage(text, 'user')
-  history.push({ role: 'user', content: text })
+  const imgs = pendingImages.filter(x => !x.uploading).map(x => x.dataUrl)
+  if ((!text && imgs.length === 0) || sending) return
+  if (pendingImages.some(x => x.uploading)) { return }  // 还在压缩
+  sending = true; sendBtn.disabled = true; attachBtn.disabled = true
+  addMessage(text, 'user', { images: imgs })
+  // history 只保留文本（多模态历史会让 base64 在内存里循环膨胀）
+  if (text) history.push({ role: 'user', content: text })
   input.value = ''
   input.style.height = 'auto'
+  // 发送即清空待发图片
+  pendingImages = []
+  renderThumbStrip()
   addTyping()
 
   try {
     const resp = await fetch('/api/chat/send', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ message: text, session_id: sessionId, history: history.slice(-10) }),
+      body: JSON.stringify({
+        message: text,
+        session_id: sessionId,
+        history: history.slice(-10),
+        images: imgs,
+      }),
     })
     const data = await resp.json()
     removeTyping()
@@ -237,10 +327,90 @@ async function send() {
     removeTyping()
     addMessage('网络不稳定，请稍后再试～', 'bot')
   } finally {
-    sending = false; sendBtn.disabled = false
+    sending = false; sendBtn.disabled = false; attachBtn.disabled = false
     input.focus()
   }
 }
+
+// ─────────── 图片上传 ───────────
+const BLANK_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAAAAACw='
+function renderThumbStrip() {
+  thumbStrip.classList.toggle('has-items', pendingImages.length > 0)
+  thumbStrip.innerHTML = pendingImages.map(item =>
+    `<div class="thumb${item.uploading ? ' uploading' : ''}" data-id="${item.id}">
+       <img src="${item.dataUrl || BLANK_PIXEL}" alt="" />
+       <button class="x" type="button" aria-label="移除" onclick="removeImage('${item.id}')">×</button>
+     </div>`
+  ).join('')
+}
+
+function removeImage(id) {
+  pendingImages = pendingImages.filter(x => x.id !== id)
+  renderThumbStrip()
+}
+
+// 用 Canvas 压缩到长边 ≤ MAX_IMAGE_SIDE 像素的 JPEG，避免手机原图 5MB+ 把请求撑爆
+async function compressImage(file) {
+  // createImageBitmap 支持 EXIF 自动旋转，比 <img>+canvas 稳；不支持时回落到 URL.createObjectURL
+  let bitmap
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+  } catch (_) {
+    const url = URL.createObjectURL(file)
+    try {
+      const img = await new Promise((res, rej) => {
+        const im = new Image()
+        im.onload = () => res(im); im.onerror = rej; im.src = url
+      })
+      bitmap = img
+    } finally {
+      URL.revokeObjectURL(url)
+    }
+  }
+  const w0 = bitmap.width, h0 = bitmap.height
+  const scale = Math.min(1, MAX_IMAGE_SIDE / Math.max(w0, h0))
+  const w = Math.round(w0 * scale), h = Math.round(h0 * scale)
+  const canvas = document.createElement('canvas')
+  canvas.width = w; canvas.height = h
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h)
+  if (bitmap.close) bitmap.close()
+  return canvas.toDataURL('image/jpeg', JPEG_QUALITY)
+}
+
+attachBtn.addEventListener('click', () => fileInput.click())
+fileInput.addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files || [])
+  e.target.value = ''  // 允许重复选同一张
+  if (!files.length) return
+  const remaining = MAX_IMAGES - pendingImages.length
+  if (remaining <= 0) { alert(`最多上传 ${MAX_IMAGES} 张图片`); return }
+  const toProcess = files.slice(0, remaining)
+  if (files.length > remaining) {
+    alert(`仅添加前 ${remaining} 张（总数上限 ${MAX_IMAGES} 张）`)
+  }
+
+  // 先用占位项渲染 loading 态，压缩完成后替换 dataUrl
+  const placeholders = toProcess.map(f => ({
+    id: 'img_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+    dataUrl: '', uploading: true, file: f,
+  }))
+  pendingImages.push(...placeholders)
+  renderThumbStrip()
+
+  for (const item of placeholders) {
+    try {
+      const dataUrl = await compressImage(item.file)
+      item.dataUrl = dataUrl
+      item.uploading = false
+      delete item.file
+    } catch (err) {
+      console.error('图片处理失败', err)
+      pendingImages = pendingImages.filter(x => x.id !== item.id)
+      alert('某张图片处理失败，可能格式不支持')
+    }
+    renderThumbStrip()
+  }
+})
 
 // 自动调整输入框高度
 input.addEventListener('input', () => {
