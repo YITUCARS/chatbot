@@ -12,6 +12,7 @@ primary_region = "ams"
   NODE_ENV = "production"
   PORT = "3000"
   DB_DIR = "/data"
+  PUBLIC_BASE_URL = "https://chat.yiturentalcars.co.nz"
 
 [[mounts]]
   source = "data"
