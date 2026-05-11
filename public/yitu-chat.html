@@ -4,18 +4,18 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
 <meta name="format-detection" content="telephone=no" />
-<title>yitu 租车助手 · 在线智能客服</title>
+<title>YITU旅行助手 在线智能客服</title>
 
 <!-- ── SEO / 卡片分享 meta（微信、QQ、Twitter、Facebook 通用） ── -->
-<meta name="description" content="yitu Rental Cars 官方智能客服 · 7×24 小时在线问答：车型与价格、押金保险、取还车流程、紧急联系，一问即答。" />
-<meta name="keywords" content="yitu, 租车, 新西兰租车, 智能客服, 在线咨询, 车型价格, 押金保险" />
+<meta name="description" content="YITU旅行助手 · 在线智能客服。7×24 小时在线问答：行程规划、美食推荐、路标/标识解释（支持拍照）、旅行攻略、当地建议、日常问题等，一问即答。" />
+<meta name="keywords" content="YITU, 旅行助手, 智能客服, 行程规划, 美食推荐, 旅行攻略, 路标识别, 拍照问答" />
 <link rel="canonical" href="__PUBLIC_BASE_URL__/chat" />
 
 <!-- Open Graph（微信抓取主要依据；Facebook / LinkedIn / 大多数 IM 也读这组） -->
 <meta property="og:type" content="website" />
-<meta property="og:site_name" content="yitu Rental Cars" />
-<meta property="og:title" content="yitu 租车助手 · 在线智能客服" />
-<meta property="og:description" content="7×24 小时在线问答：车型与价格、押金保险、取还车流程、紧急联系，一问即答。" />
+<meta property="og:site_name" content="YITU旅行助手" />
+<meta property="og:title" content="YITU旅行助手 在线智能客服" />
+<meta property="og:description" content="YITU旅行助手 · 在线智能客服。7×24 小时在线问答：行程规划、美食推荐、路标/标识解释（支持拍照）、旅行攻略、当地建议、日常问题等，一问即答。" />
 <meta property="og:url" content="__PUBLIC_BASE_URL__/chat" />
 
 <!-- 第一张 og:image：方形 1024×1024（微信对话框小卡片缩略图优先用方图，避免被中心裁切吃掉文字） -->
@@ -31,15 +31,15 @@
 <meta property="og:locale" content="zh_CN" />
 
 <!-- 微信专用：itemprop image 作为卡片缩略图兜底；name image 兼容旧版微信。两处都指向方图 -->
-<meta itemprop="name" content="yitu 租车助手 · 在线智能客服" />
-<meta itemprop="description" content="7×24 小时在线问答：车型、价格、押金、保险、取还车。" />
+<meta itemprop="name" content="YITU旅行助手 在线智能客服" />
+<meta itemprop="description" content="YITU旅行助手 · 在线智能客服。7×24 小时在线问答：行程规划、美食推荐、路标/标识解释（支持拍照）、旅行攻略、当地建议、日常问题等，一问即答。" />
 <meta itemprop="image" content="__PUBLIC_BASE_URL__/yitu-card-square.png" />
 <meta name="image" content="__PUBLIC_BASE_URL__/yitu-card-square.png" />
 
 <!-- Twitter Card：用长方形 -->
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="yitu 租车助手 · 在线智能客服" />
-<meta name="twitter:description" content="7×24 小时在线问答：车型、价格、押金、保险、取还车。" />
+<meta name="twitter:title" content="YITU旅行助手 在线智能客服" />
+<meta name="twitter:description" content="YITU旅行助手 · 在线智能客服。7×24 小时在线问答：行程规划、美食推荐、路标/标识解释（支持拍照）、旅行攻略、当地建议、日常问题等，一问即答。" />
 <meta name="twitter:image" content="__PUBLIC_BASE_URL__/yitu-card.png" />
 
 <link rel="icon" type="image/svg+xml" href="/yitu-card.svg" />
@@ -98,14 +98,6 @@
   .typing .dot:nth-child(2) { animation-delay: 0.2s; }
   .typing .dot:nth-child(3) { animation-delay: 0.4s; }
   @keyframes blink { 0%, 80%, 100% { opacity: 0.3; } 40% { opacity: 1; } }
-
-  /* —— 快捷问题 —— */
-  .suggestions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
-  .suggestions button {
-    border: 1px solid var(--line); background: #fff; color: var(--ink);
-    padding: 8px 14px; border-radius: 999px; font-size: 13.5px; font-family: inherit;
-  }
-  .suggestions button:active { background: var(--ink); color: #fff; }
 
   /* —— 输入区 —— */
   .input-area {
@@ -224,7 +216,7 @@ const attachBtn = $('attachBtn')
 const thumbStrip = $('thumbStrip')
 let history = []
 let sending = false
-let config = { bot_name: 'yitu 助手', welcome_msg: '您好！欢迎咨询～', suggestions: ['车型价格', '押金', '保险', '取还车'], enabled: true }
+let config = { bot_name: 'YITU旅行助手', welcome_msg: '您好！欢迎咨询～', enabled: true }
 
 // 图片：仅存在 JS 内存，刷新/关闭页面即释放，从不写入 localStorage / 服务器磁盘
 const MAX_IMAGES = 4
@@ -249,14 +241,6 @@ function addMessage(text, who, opts = {}) {
   const textHtml = text ? escapeHtml(text) : ''
   el.innerHTML = `<div class="bubble">${imgsHtml}${textHtml}</div>`
   msgWrap.appendChild(el)
-  if (opts.suggestions?.length) {
-    const sg = document.createElement('div')
-    sg.className = 'suggestions'
-    sg.style.alignSelf = 'flex-start'
-    sg.innerHTML = opts.suggestions.map(s => `<button>${escapeHtml(s)}</button>`).join('')
-    sg.querySelectorAll('button').forEach(b => b.onclick = () => { input.value = b.textContent; send() })
-    msgWrap.appendChild(sg)
-  }
   scrollDown()
 }
 
@@ -282,7 +266,7 @@ async function loadConfig() {
     config = { ...config, ...c }
     $('botName').textContent = config.bot_name
     $('avatar').textContent = (config.bot_name || 'V').slice(0, 1).toUpperCase()
-    addMessage(config.welcome_msg, 'bot', { suggestions: config.suggestions })
+    addMessage(config.welcome_msg, 'bot')
   } catch (e) {
     addMessage('连接失败，请稍后再试。', 'bot')
   }

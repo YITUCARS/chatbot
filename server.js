@@ -307,20 +307,9 @@ app.post('/api/admin/unanswered/:id/resolve', requireAdmin, (req, res) => {
 
 app.get('/api/chat/config', (_req, res) => {
   const s = db.getAllSettings()
-  // 从话术里抽 4 个常见类目的代表词作为「快捷问题」按钮
-  const scripts = db.listScripts()
-  const wanted = ['车型价格', '押金', '保险', '取还车', '联系方式']
-  const suggestions = []
-  for (const cat of wanted) {
-    const hit = scripts.find(x => (x.category || '').includes(cat))
-                || db.listKnowledge().find(x => (x.category || '').includes(cat))
-    if (hit) suggestions.push(cat)
-    if (suggestions.length >= 4) break
-  }
   res.json({
-    bot_name: s.bot_name || 'yitu 助手',
+    bot_name: s.bot_name || 'YITU旅行助手',
     welcome_msg: s.welcome_msg || '您好，有什么可以帮您？',
-    suggestions: suggestions.length ? suggestions : ['车型价格', '押金', '保险', '取还车'],
     enabled: s.enabled !== false,
   })
 })
