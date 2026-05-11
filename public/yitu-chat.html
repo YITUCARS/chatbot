@@ -17,18 +17,26 @@
 <meta property="og:title" content="yitu 租车助手 · 在线智能客服" />
 <meta property="og:description" content="7×24 小时在线问答：车型与价格、押金保险、取还车流程、紧急联系，一问即答。" />
 <meta property="og:url" content="__PUBLIC_BASE_URL__/chat" />
+
+<!-- 第一张 og:image：方形 1024×1024（微信对话框小卡片缩略图优先用方图，避免被中心裁切吃掉文字） -->
+<meta property="og:image" content="__PUBLIC_BASE_URL__/yitu-card-square.png" />
+<meta property="og:image:width" content="1024" />
+<meta property="og:image:height" content="1024" />
+<meta property="og:image:type" content="image/png" />
+<!-- 第二张 og:image：长方形 1200×630（Facebook / LinkedIn 大图卡片标准尺寸） -->
 <meta property="og:image" content="__PUBLIC_BASE_URL__/yitu-card.png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
+<meta property="og:image:type" content="image/png" />
 <meta property="og:locale" content="zh_CN" />
 
-<!-- 微信专用：itemprop image 作为卡片缩略图兜底；name image 兼容旧版微信 -->
+<!-- 微信专用：itemprop image 作为卡片缩略图兜底；name image 兼容旧版微信。两处都指向方图 -->
 <meta itemprop="name" content="yitu 租车助手 · 在线智能客服" />
 <meta itemprop="description" content="7×24 小时在线问答：车型、价格、押金、保险、取还车。" />
-<meta itemprop="image" content="__PUBLIC_BASE_URL__/yitu-card.png" />
-<meta name="image" content="__PUBLIC_BASE_URL__/yitu-card.png" />
+<meta itemprop="image" content="__PUBLIC_BASE_URL__/yitu-card-square.png" />
+<meta name="image" content="__PUBLIC_BASE_URL__/yitu-card-square.png" />
 
-<!-- Twitter Card -->
+<!-- Twitter Card：用长方形 -->
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content="yitu 租车助手 · 在线智能客服" />
 <meta name="twitter:description" content="7×24 小时在线问答：车型、价格、押金、保险、取还车。" />
