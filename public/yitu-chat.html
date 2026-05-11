@@ -107,14 +107,6 @@
   }
   .suggestions button:active { background: var(--ink); color: #fff; }
 
-  /* —— 转人工按钮 —— */
-  .human-bar { padding: 8px 14px 4px; }
-  .human-bar button {
-    width: 100%; background: transparent; border: 1px dashed var(--line);
-    padding: 10px; border-radius: 12px; color: var(--ink-2);
-    font-family: inherit; font-size: 13.5px;
-  }
-
   /* —— 输入区 —— */
   .input-area {
     flex: none; background: var(--bg); border-top: 1px solid var(--line);
@@ -135,23 +127,6 @@
   }
   .input-area button.send:disabled { opacity: 0.4; }
 
-  /* —— 联系弹窗 —— */
-  .modal-mask { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: none; align-items: flex-end; justify-content: center; z-index: 100; }
-  .modal-mask.open { display: flex; }
-  .modal {
-    background: #fff; width: 100%; border-top-left-radius: 20px; border-top-right-radius: 20px;
-    padding: 24px 22px calc(24px + var(--safe-bottom)); animation: slideUp 0.25s ease;
-  }
-  @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-  .modal h3 { margin: 0 0 6px; font-size: 18px; }
-  .modal p { margin: 0 0 18px; font-size: 13.5px; color: var(--ink-2); }
-  .modal label { display: block; font-size: 13px; color: var(--ink-2); margin: 10px 0 6px; }
-  .modal input { width: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; font-family: inherit; font-size: 15px; outline: none; }
-  .modal input:focus { border-color: var(--ink); }
-  .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
-  .modal-actions button { flex: 1; padding: 12px; border-radius: 12px; font-family: inherit; font-size: 15px; font-weight: 600; }
-  .btn-cancel { background: var(--bg); border: 1px solid var(--line); color: var(--ink); }
-  .btn-confirm { background: var(--ink); border: 0; color: #fff; }
 </style>
 </head>
 <body>
@@ -167,28 +142,9 @@
 
   <div class="messages" id="messages"></div>
 
-  <div class="human-bar">
-    <button onclick="openContact()">📞 联系人工客服</button>
-  </div>
-
   <div class="input-area">
     <textarea id="input" rows="1" placeholder="请输入您的问题..." enterkeyhint="send"></textarea>
     <button class="send" id="sendBtn" onclick="send()">发送</button>
-  </div>
-</div>
-
-<div id="contactModal" class="modal-mask">
-  <div class="modal">
-    <h3>联系人工客服</h3>
-    <p>请留下您的姓名和电话，客服会尽快回拨。</p>
-    <label>姓名</label>
-    <input id="cName" type="text" placeholder="您的姓名" />
-    <label>电话</label>
-    <input id="cPhone" type="tel" inputmode="tel" placeholder="手机号" />
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeContact()">取消</button>
-      <button class="btn-confirm" onclick="submitContact()">提交</button>
-    </div>
   </div>
 </div>
 
@@ -297,27 +253,6 @@ input.addEventListener('keydown', e => {
     e.preventDefault(); send()
   }
 })
-
-// 联系人工
-function openContact() { $('contactModal').classList.add('open') }
-function closeContact() { $('contactModal').classList.remove('open') }
-async function submitContact() {
-  const name = $('cName').value.trim()
-  const phone = $('cPhone').value.trim()
-  if (!name || !phone) { alert('请填写姓名和电话'); return }
-  // 把联系请求作为一条「问题」走 chat，方便后台看到
-  await fetch('/api/chat/send', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      message: `[转人工请求] 姓名：${name}，电话：${phone}`,
-      session_id: sessionId,
-      history: [],
-    }),
-  }).catch(() => {})
-  closeContact()
-  addMessage(`已收到您的联系方式（${name} ${phone}），客服会尽快回拨，请保持电话畅通～`, 'bot')
-}
 
 loadConfig()
 </script>
